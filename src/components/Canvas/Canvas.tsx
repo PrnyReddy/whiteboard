@@ -17,7 +17,53 @@ const Canvas: React.FC<CanvasProps> = ({
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const isDrawing = useRef(false);
 
-  const { startPath, addPoint, endPath } = useStore();
+  const { 
+    paths,
+    currentPath,
+    startPath, 
+    addPoint, 
+    endPath 
+  } = useStore();
+
+  const draw = () => {
+    const context = contextRef.current;
+    const canvas = canvasRef.current;
+    if (!context || !canvas) return;
+
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    paths.forEach(path => {
+      context.beginPath();
+      context.strokeStyle = path.color;
+      context.lineWidth = path.size;
+      
+      const points = path.points;
+      if (points.length > 0) {
+        context.moveTo(points[0].x, points[0].y);
+        points.slice(1).forEach(point => {
+          context.lineTo(point.x, point.y);
+        });
+        context.stroke();
+      }
+    });
+
+    if (currentPath && currentPath.points.length > 0) {
+      context.beginPath();
+      context.strokeStyle = currentPath.color;
+      context.lineWidth = currentPath.size;
+      
+      const points = currentPath.points;
+      context.moveTo(points[0].x, points[0].y);
+      points.slice(1).forEach(point => {
+        context.lineTo(point.x, point.y);
+      });
+      context.stroke();
+    }
+  };
+
+  useEffect(() => {
+    draw();
+  }, [paths, currentPath]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
