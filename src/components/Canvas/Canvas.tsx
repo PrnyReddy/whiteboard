@@ -18,6 +18,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const isDrawing = useRef(false);
 
   const { 
+    tool,
     paths,
     currentPath,
     startPath, 
@@ -34,7 +35,14 @@ const Canvas: React.FC<CanvasProps> = ({
 
     paths.forEach(path => {
       context.beginPath();
-      context.strokeStyle = path.color;
+      if (path.tool === 'eraser') {
+        context.globalCompositeOperation = 'destination-out';
+        context.strokeStyle = 'rgba(0,0,0,1)';
+      } else {
+        context.globalCompositeOperation = 'source-over';
+        context.strokeStyle = path.color;
+      }
+      
       context.lineWidth = path.size;
       
       const points = path.points;
@@ -45,11 +53,20 @@ const Canvas: React.FC<CanvasProps> = ({
         });
         context.stroke();
       }
+      context.globalCompositeOperation = 'source-over';
     });
 
     if (currentPath && currentPath.points.length > 0) {
       context.beginPath();
-      context.strokeStyle = currentPath.color;
+      
+      if (currentPath.tool === 'eraser') {
+        context.globalCompositeOperation = 'destination-out';
+        context.strokeStyle = 'rgba(0,0,0,1)';
+      } else {
+        context.globalCompositeOperation = 'source-over';
+        context.strokeStyle = currentPath.color;
+      }
+      
       context.lineWidth = currentPath.size;
       
       const points = currentPath.points;
@@ -58,6 +75,7 @@ const Canvas: React.FC<CanvasProps> = ({
         context.lineTo(point.x, point.y);
       });
       context.stroke();
+      context.globalCompositeOperation = 'source-over';
     }
   };
 
@@ -75,24 +93,32 @@ const Canvas: React.FC<CanvasProps> = ({
     if (!context) return;
 
     context.lineCap = 'round';
-    context.lineJoin = 'round';
-    context.strokeStyle = '#000000';
-    context.lineWidth = 2;
-    
+    context.lineJoin = 'round';    
     contextRef.current = context;
   }, [width, height]);
 
+  useEffect(() => {
+    const context = contextRef.current;
+    if (!context) return;
+
+    if (tool === 'eraser') {
+      context.globalCompositeOperation = 'destination-out';
+      context.strokeStyle = 'rgba(0,0,0,1)';
+    } else {
+      context.globalCompositeOperation = 'source-over';
+      context.strokeStyle = '#000000';
+    }
+  }, [tool]);
+
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     isDrawing.current = true;
-    
     const canvas = canvasRef.current;
     if (!canvas) return;
-
+  
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-
-    startPath();
+    startPath(); 
     addPoint({ x, y });
   };
 
