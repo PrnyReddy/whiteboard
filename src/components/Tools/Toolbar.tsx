@@ -5,7 +5,12 @@ import styles from './Toolbar.module.css';
 import { useStore } from '@/store/useStore';
 
 const Toolbar = () => {
-  const { tool, setTool } = useStore();
+  const { tool, setTool, size, setSize } = useStore();
+
+  const handleSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newSize = parseInt(e.target.value);
+    setSize(newSize);
+  };
 
   return (
     <div className={styles.toolbar}>
@@ -22,6 +27,30 @@ const Toolbar = () => {
         >
           Eraser
         </button>
+      </div>
+      <div className={styles.sizeControl}>
+        <span className={styles.sizeLabel}>
+          {tool === 'eraser' ? 'Eraser Size' : 'Brush Size'}
+        </span>
+        <div
+          style={{
+            width: Math.max(12, size),
+            height: Math.max(12, size),
+            borderRadius: '50%',
+            background: tool === 'eraser' ? '#ddd' : '#666',
+            border: '1px solid #666',
+            margin: '10px 0',
+          }}
+        />
+        <input
+          type="range"
+          min="1"
+          max="50"
+          value={size}
+          onChange={handleSizeChange}
+          className={styles.sizeSlider}
+        />
+        <span className={styles.sizeValue}>{size}px</span>
       </div>
     </div>
   );

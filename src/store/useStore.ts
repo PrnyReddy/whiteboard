@@ -15,13 +15,16 @@ interface DrawingStore extends DrawingState {
 export const useStore = create<DrawingStore>((set, get) => ({
   tool: 'pen',
   color: '#000000',
-  size: 2,
+  size: 5,
   paths: [],
   currentPath: null,
 
   setTool: (tool) => set({ tool }),
   setColor: (color) => set({ color }),
-  setSize: (size) => set({ size }),
+  setSize: (size) => {
+    const validSize = Math.max(1, Math.min(50, size));
+    set({ size: validSize });
+  },
   
   startPath: () => {
     const { tool, color, size } = get();
