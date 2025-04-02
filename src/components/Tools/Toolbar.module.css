@@ -90,3 +90,33 @@
   color: #666;
   margin-top: 5px;
 }
+
+.historyControl {
+  display: flex;
+  gap: 5px;
+  padding: 10px;
+  border-top: 1px solid #eee;
+}
+
+.historyButton {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  color: #666;
+}
+
+.historyButton:hover:not(:disabled) {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.historyButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

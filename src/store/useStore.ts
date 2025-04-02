@@ -3,6 +3,8 @@ import { DrawingState, DrawingTool, Path, Point } from '../types';
 
 interface DrawingStore extends DrawingState {
   currentPath: Path | null; 
+  history: Path[][];
+  redoStack: Path[][]; 
   setTool: (tool: DrawingTool) => void;
   setColor: (color: string) => void;
   setSize: (size: number) => void;
@@ -10,6 +12,8 @@ interface DrawingStore extends DrawingState {
   startPath: () => void;
   endPath: () => void;
   clearCanvas: () => void;
+  undo: () => void;
+  redo: () => void;
 }
 
 export const useStore = create<DrawingStore>((set, get) => ({
@@ -18,6 +22,8 @@ export const useStore = create<DrawingStore>((set, get) => ({
   size: 5,
   paths: [],
   currentPath: null,
+  history: [],
+  redoStack: [],
 
   setTool: (tool) => set({ tool }),
   setColor: (color) => set({ color }),
@@ -50,12 +56,56 @@ export const useStore = create<DrawingStore>((set, get) => ({
     })),
   
   endPath: () => 
-    set((state) => ({
-      paths: state.currentPath 
-        ? [...state.paths, state.currentPath]
-        : state.paths,
-      currentPath: null
-    })),
+    set((state) => {
+      if (!state.currentPath) return state;
+      
+      const newHistory = [...state.history, state.paths];
+      const newPaths = [...state.paths, state.currentPath];
+      
+      return {
+        paths: newPaths,
+        currentPath: null,
+        history: newHistory,
+        redoStack: []
+      };
+    }),
+
+  undo: () => 
+    set((state) => {
+      if (state.history.length === 0) return state;
+      
+      const newHistory = [...state.history];
+      const previousPaths = newHistory.pop();
+      const newRedoStack = [...state.redoStack, state.paths];
+      
+      return {
+        paths: previousPaths || [],
+        history: newHistory,
+        redoStack: newRedoStack,
+        currentPath: null
+      };
+    }),
   
-  clearCanvas: () => set({ paths: [], currentPath: null })
+  redo: () => 
+    set((state) => {
+      if (state.redoStack.length === 0) return state;
+      
+      const newRedoStack = [...state.redoStack];
+      const nextPaths = newRedoStack.pop();
+      const newHistory = [...state.history, state.paths];
+      
+      return {
+        paths: nextPaths || [],
+        history: newHistory,
+        redoStack: newRedoStack,
+        currentPath: null
+      };
+    }),
+  
+  clearCanvas: () => set({ 
+    paths: [], 
+    currentPath: null,
+    history: [],
+    redoStack: []
+  })
 }));
