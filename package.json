@@ -1,35 +1,18 @@
 {
-  "name": "whiteboard",
-  "version": "0.1.0",
-  "private": true,
+  "name": "whiteboard-workspace",
+  "version": "1.0.0",
+  "description": "Collaborative whiteboard application",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "client": "cd client && npm run dev",
+    "server": "cd server && npm run dev",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install"
   },
-  "dependencies": {
-    "@heroicons/react": "^2.2.0",
-    "@types/socket.io-client": "^3.0.0",
-    "@types/uuid": "^10.0.0",
-    "classnames": "^2.5.1",
-    "next": "15.2.4",
-    "react": "^19.0.0",
-    "react-colorful": "^5.6.1",
-    "react-dom": "^19.0.0",
-    "socket.io-client": "^4.8.1",
-    "uuid": "^11.1.0",
-    "zustand": "^5.0.3"
-  },
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "15.2.4",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "concurrently": "^8.0.1"
   }
 }
