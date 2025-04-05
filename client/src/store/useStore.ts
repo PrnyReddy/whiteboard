@@ -14,6 +14,7 @@ interface DrawingStore extends DrawingState {
   clearCanvas: () => void;
   undo: () => void;
   redo: () => void;
+  setRemotePath: (path: Path) => void;
 }
 
 export const useStore = create<DrawingStore>((set, get) => ({
@@ -65,6 +66,16 @@ export const useStore = create<DrawingStore>((set, get) => ({
       return {
         paths: newPaths,
         currentPath: null,
+        history: newHistory,
+        redoStack: []
+      };
+    }),
+
+  setRemotePath: (path: Path) => 
+    set((state) => {
+      const newHistory = [...state.history, state.paths];
+      return {
+        paths: [...state.paths, path],
         history: newHistory,
         redoStack: []
       };

@@ -1,6 +1,6 @@
-'use client';
-
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
+import { useSocket } from '@/hooks/useSocket';
+import { DrawingData, Point, DrawingTool } from '@/types';
 import styles from './Canvas.module.css';
 import { useStore } from '@/store/useStore';
 
@@ -23,10 +23,11 @@ const Canvas: React.FC<CanvasProps> = ({
     currentPath,
     startPath, 
     addPoint, 
-    endPath 
+    endPath,
+    setRemotePath
   } = useStore();
 
-  const draw = () => {
+  const draw = useCallback(() => {
     const context = contextRef.current;
     const canvas = canvasRef.current;
     if (!context || !canvas) return;
@@ -77,12 +78,37 @@ const Canvas: React.FC<CanvasProps> = ({
       context.stroke();
       context.globalCompositeOperation = 'source-over';
     }
-  };
-
-  useEffect(() => {
-    draw();
   }, [paths, currentPath]);
 
+  const { initSocket, emitDrawing, subscribeToDrawing } = useSocket();
+
+  const handleRemoteDrawing = useCallback((data: DrawingData) => {
+    console.log('Received remote drawing:', data);
+    setRemotePath({
+      id: Date.now().toString(),
+      tool: data.tool as DrawingTool,
+      points: data.points,
+      color: data.color,
+      size: data.size
+    });
+  }, [setRemotePath]);
+
+  useEffect(() => {
+    const cleanup = initSocket();
+    return cleanup;
+  }, [initSocket]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToDrawing(handleRemoteDrawing);
+    return unsubscribe;
+  }, [subscribeToDrawing, handleRemoteDrawing]);
+
+  // Handle drawing updates
+  useEffect(() => {
+    draw();
+  }, [draw]);
+
+  // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -110,7 +136,8 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   }, [tool]);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
     isDrawing.current = true;
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -120,10 +147,11 @@ const Canvas: React.FC<CanvasProps> = ({
     const y = e.clientY - rect.top;
     startPath(); 
     addPoint({ x, y });
-  };
+  }, [startPath, addPoint]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing.current) return;
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!isDrawing.current || !currentPath) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -133,14 +161,21 @@ const Canvas: React.FC<CanvasProps> = ({
     const y = e.clientY - rect.top;
 
     addPoint({ x, y });
-  };
+    emitDrawing({
+      points: currentPath.points,
+      color: currentPath.color,
+      size: currentPath.size,
+      tool: currentPath.tool
+    });
+  }, [addPoint, currentPath, emitDrawing]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
     if (!isDrawing.current) return;
     
     isDrawing.current = false;
     endPath();
-  };
+  }, [endPath]);
 
   return (
     <div className={styles.canvasContainer}>
