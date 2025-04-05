@@ -26,3 +26,8 @@ export type DrawingData = {
   size: number;
   tool: string;
 };
+
+export interface UserData {
+  id: string;
+  color: string;
+}

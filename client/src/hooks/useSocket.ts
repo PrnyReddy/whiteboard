@@ -1,11 +1,12 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { DrawingData } from '@/types';
+import { DrawingData, UserData } from '@/types';
 
 const SOCKET_URL = 'http://localhost:3001';
 
 export const useSocket = () => {
   const socketRef = useRef<Socket | null>(null);
+  const [userColor, setUserColor] = useState<string>('#000000');
 
   const initSocket = useCallback(() => {
     if (socketRef.current?.connected) {
@@ -19,6 +20,11 @@ export const useSocket = () => {
       socketRef.current.on('connect', () => {
         console.log('Connected to server with ID:', socketRef.current?.id);
         socketRef.current?.emit('client-ready');
+      });
+
+      socketRef.current.on('client-ready', (userData: UserData) => {
+        console.log('Received user color:', userData.color);
+        setUserColor(userData.color);
       });
 
       socketRef.current.on('client-count', (count: number) => {
@@ -68,5 +74,6 @@ export const useSocket = () => {
     initSocket,
     emitDrawing,
     subscribeToDrawing,
+    userColor
   };
 };

@@ -13,6 +13,7 @@ export interface DrawingData {
 export interface ServerToClientEvents {
   'drawing': (data: DrawingData) => void;
   'client-count': (count: number) => void;
+  'client-ready': (data: UserData) => void;
 }
 
 export interface ClientToServerEvents {
@@ -26,4 +27,11 @@ export interface InterServerEvents {
 
 export interface SocketData {
   userId: string;
+  userColor?: string;
+  roomId?: string;
+}
+
+export interface UserData {
+  id: string;
+  color: string;
 }

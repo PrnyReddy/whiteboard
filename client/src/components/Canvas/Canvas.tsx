@@ -24,8 +24,16 @@ const Canvas: React.FC<CanvasProps> = ({
     startPath, 
     addPoint, 
     endPath,
-    setRemotePath
+    setRemotePath,
+    setColor
   } = useStore();
+
+  const { initSocket, emitDrawing, subscribeToDrawing, userColor } = useSocket();
+  useEffect(() => {
+    if (userColor) {
+      setColor(userColor);
+    }
+  }, [userColor, setColor]);
 
   const draw = useCallback(() => {
     const context = contextRef.current;
@@ -80,7 +88,6 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   }, [paths, currentPath]);
 
-  const { initSocket, emitDrawing, subscribeToDrawing } = useSocket();
 
   const handleRemoteDrawing = useCallback((data: DrawingData) => {
     console.log('Received remote drawing:', data);

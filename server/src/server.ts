@@ -5,47 +5,68 @@ import {
   ServerToClientEvents, 
   InterServerEvents, 
   SocketData,
-  DrawingData 
+  DrawingData,
+  UserData 
 } from './types/events';
 
 const httpServer = createServer();
-const io = new Server<
-  ClientToServerEvents,
-  ServerToClientEvents,
-  InterServerEvents,
-  SocketData
->(httpServer, {
+const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(httpServer, {
   cors: {
     origin: "http://localhost:3000",
     methods: ["GET", "POST"]
   }
 });
 
-let connectedClients = 0;
+const rooms = new Map<string, Set<string>>();
+
+const userColors = new Map<string, string>();
+
+const getRandomColor = () => {
+  const colors = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
+    '#FFEEAD', '#D4A5A5', '#9B59B6', '#3498DB',
+    '#E74C3C', '#2ECC71', '#F1C40F', '#1ABC9C'
+  ];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
-  connectedClients++;
+  
+  const userColor = getRandomColor();
+  userColors.set(socket.id, userColor);
+  socket.data.userColor = userColor;
 
-  io.emit('client-count', connectedClients);
-
-  socket.on('client-ready', () => {
-    console.log('Client ready:', socket.id);
-  });
+  socket.emit('client-ready', {
+    id: socket.id,
+    color: userColor
+  } as UserData);
 
   socket.on('draw', (data: DrawingData) => {
-    socket.broadcast.emit('drawing', data);
+    const drawingWithColor = {
+      ...data,
+      color: data.color || socket.data.userColor || '#000000'
+    };
+    socket.broadcast.emit('drawing', drawingWithColor);
   });
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
-    connectedClients--;
-    io.emit('client-count', connectedClients);
+    userColors.delete(socket.id);
+
+    if (socket.data.roomId) {
+      const room = rooms.get(socket.data.roomId);
+      if (room) {
+        room.delete(socket.id);
+        if (room.size === 0) {
+          rooms.delete(socket.data.roomId);
+        }
+      }
+    }
   });
 });
 
 const PORT = process.env.PORT || 3001;
-
 httpServer.listen(PORT, () => {
   console.log(`WebSocket server running on port ${PORT}`);
 });
