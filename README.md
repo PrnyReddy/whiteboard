@@ -15,7 +15,7 @@ A real-time collaborative whiteboard application enabling multiple users to draw
 ## 💻 Tech Stack
 
 - **Frontend**: Next.js, React, TypeScript
-- **Real-time Communication**: WebSocket, WebRTC
+- **Real-time Communication**: WebSocket
 - **Backend**: Node.js, Redis
 - **Authentication**: Google OAuth
 - **Styling**: Tailwind CSS
