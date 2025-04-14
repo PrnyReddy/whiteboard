@@ -4,28 +4,38 @@ export type Point = {
 };
 
 export type DrawingTool = 'pen' | 'eraser' | 'rectangle' | 'circle';
+export type ShapeStyle = 'stroke' | 'fill';
 
-export type Path = {
+export interface ShapeData {
+  startPoint: Point;
+  endPoint: Point;
+  style: ShapeStyle;
+}
+
+export interface Path {
   id: string;
   tool: DrawingTool;
   points: Point[];
   color: string;
   size: number;
-};
+  shapeData?: ShapeData;
+}
 
-export type DrawingState = {
+export interface DrawingState {
   tool: DrawingTool;
   color: string;
   size: number;
   paths: Path[];
-};
+  shapeStyle: ShapeStyle;
+}
 
-export type DrawingData = {
+export interface DrawingData {
   points: Point[];
   color: string;
   size: number;
   tool: string;
-};
+  shapeData?: ShapeData;
+}
 
 export interface UserData {
   id: string;
