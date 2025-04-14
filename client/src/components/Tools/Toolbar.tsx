@@ -3,12 +3,26 @@
 import React from 'react';
 import styles from './Toolbar.module.css';
 import { useStore } from '@/store/useStore';
+import { DrawingTool, ShapeStyle } from '@/types';
+
+const tools: { name: DrawingTool; icon: string }[] = [
+  { name: 'pen', icon: '✏️' },
+  { name: 'eraser', icon: '🧼' },
+  { name: 'rectangle', icon: '⬜' },
+  { name: 'circle', icon: '⭕' },
+];
+
+const shapeStyles: { name: ShapeStyle; icon: string }[] = [
+  { name: 'stroke', icon: '◻️' },
+  { name: 'fill', icon: '⬛' },
+];
 
 const Toolbar = () => {
   const { 
     tool, setTool, 
     size, setSize,
     history, redoStack,
+    shapeStyle, setShapeStyle,
     undo, redo 
   } = useStore();
 
@@ -16,7 +30,6 @@ const Toolbar = () => {
     const newSize = parseInt(e.target.value);
     setSize(newSize);
   };
-
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -39,23 +52,38 @@ const Toolbar = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
+  const isShapeTool = tool === 'rectangle' || tool === 'circle';
+
   return (
     <div className={styles.toolbar}>
       <div className={styles.toolSection}>
-        <button
-          className={`${styles.toolButton} ${tool === 'pen' ? styles.active : ''}`}
-          onClick={() => setTool('pen')}
-        >
-          Pen
-        </button>
-        <button
-          className={`${styles.toolButton} ${tool === 'eraser' ? styles.active : ''}`}
-          onClick={() => setTool('eraser')}
-        >
-          Eraser
-        </button>
+        {tools.map(({ name, icon }) => (
+          <button
+            key={name}
+            className={`${styles.toolButton} ${tool === name ? styles.active : ''}`}
+            onClick={() => setTool(name)}
+            title={name.charAt(0).toUpperCase() + name.slice(1)}
+          >
+            {icon}
+          </button>
+        ))}
       </div>
       
+      {isShapeTool && (
+        <div className={styles.shapeStyles}>
+          {shapeStyles.map(({ name, icon }) => (
+            <button
+              key={name}
+              className={`${styles.toolButton} ${shapeStyle === name ? styles.active : ''}`}
+              onClick={() => setShapeStyle(name)}
+              title={name.charAt(0).toUpperCase() + name.slice(1)}
+            >
+              {icon}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className={styles.historyControl}>
         <button 
           className={styles.historyButton}
@@ -63,7 +91,7 @@ const Toolbar = () => {
           disabled={history.length === 0}
           title="Undo (Ctrl+Z)"
         >
-          Undo
+          ↩️
         </button>
         <button 
           className={styles.historyButton}
@@ -71,13 +99,13 @@ const Toolbar = () => {
           disabled={redoStack.length === 0}
           title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
         >
-          Redo
+          ↪️
         </button>
       </div>
 
       <div className={styles.sizeControl}>
         <span className={styles.sizeLabel}>
-          {tool === 'eraser' ? 'Eraser Size' : 'Brush Size'}
+          {tool === 'eraser' ? 'Eraser Size' : isShapeTool ? 'Border Size' : 'Brush Size'}
         </span>
         <div
           style={{
