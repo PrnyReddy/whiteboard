@@ -12,6 +12,9 @@
 }
 
 .toolSection {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 5px;
   border-bottom: 1px solid #eee;
   padding-bottom: 10px;
 }
@@ -19,6 +22,14 @@
 .toolSection:last-child {
   border-bottom: none;
   padding-bottom: 0;
+}
+
+.shapeStyles {
+  display: flex;
+  gap: 5px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+  justify-content: center;
 }
 
 .toolButton {
@@ -31,15 +42,18 @@
   align-items: center;
   justify-content: center;
   background: transparent;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  font-size: 20px;
 }
 
 .toolButton:hover {
   background: #f0f0f0;
+  transform: scale(1.05);
 }
 
 .toolButton.active {
   background: #e0e0e0;
+  transform: scale(0.95);
 }
 
 .sizeControl {
@@ -54,6 +68,8 @@
   font-size: 12px;
   color: #666;
   margin-bottom: 5px;
+  text-align: center;
+  min-height: 30px;
 }
 
 .sizeSlider {
@@ -96,10 +112,11 @@
   gap: 5px;
   padding: 10px;
   border-top: 1px solid #eee;
+  justify-content: center;
 }
 
 .historyButton {
-  padding: 5px 10px;
+  padding: 8px;
   border: none;
   border-radius: 4px;
   background: transparent;
@@ -107,16 +124,51 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s;
-  color: #666;
+  transition: all 0.2s ease;
+  font-size: 18px;
 }
 
 .historyButton:hover:not(:disabled) {
   background: #f0f0f0;
-  color: #333;
+  transform: scale(1.1);
 }
 
 .historyButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    top: auto;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: row;
+    align-items: center;
+    padding: 8px;
+  }
+
+  .toolSection {
+    grid-template-columns: 1fr;
+    border-bottom: none;
+    border-right: 1px solid #eee;
+    padding-right: 8px;
+  }
+
+  .shapeStyles {
+    padding: 0 8px;
+    border-bottom: none;
+    border-right: 1px solid #eee;
+  }
+
+  .historyControl {
+    border-top: none;
+    padding: 0 8px;
+  }
+
+  .sizeControl {
+    border-top: none;
+    padding: 0 8px;
+  }
 }

@@ -1,15 +1,18 @@
 import { create } from 'zustand';
-import { DrawingState, DrawingTool, Path, Point } from '../types';
+import { DrawingState, DrawingTool, Path, Point, ShapeStyle } from '../types';
 
 interface DrawingStore extends DrawingState {
-  currentPath: Path | null; 
+  currentPath: Path | null;
   history: Path[][];
-  redoStack: Path[][]; 
+  redoStack: Path[][];
+  shapeInProgress: boolean;
   setTool: (tool: DrawingTool) => void;
   setColor: (color: string) => void;
   setSize: (size: number) => void;
+  setShapeStyle: (style: ShapeStyle) => void;
   addPoint: (point: Point) => void;
-  startPath: () => void;
+  startPath: (point?: Point) => void;
+  updateShape: (endPoint: Point) => void;
   endPath: () => void;
   clearCanvas: () => void;
   undo: () => void;
@@ -25,6 +28,8 @@ export const useStore = create<DrawingStore>((set, get) => ({
   currentPath: null,
   history: [],
   redoStack: [],
+  shapeInProgress: false,
+  shapeStyle: 'stroke',
 
   setTool: (tool) => set({ tool }),
   setColor: (color) => set({ color }),
@@ -33,18 +38,57 @@ export const useStore = create<DrawingStore>((set, get) => ({
     set({ size: validSize });
   },
   
-  startPath: () => {
-    const { tool, color, size } = get();
-    set({
-      currentPath: {
-        id: Date.now().toString(),
-        tool,
-        points: [],
-        color,
-        size
-      }
+  startPath: (point?: Point) => {
+    const { tool, color, size, shapeStyle } = get();
+    const id = Date.now().toString();
+    const startPoint = point || { x: 0, y: 0 };
+
+    if (tool === 'rectangle' || tool === 'circle') {
+      set({
+        currentPath: {
+          id,
+          tool,
+          points: [],
+          color,
+          size,
+          shapeData: {
+            startPoint,
+            endPoint: startPoint,
+            style: shapeStyle
+          }
+        },
+        shapeInProgress: true
+      });
+    } else {
+      set({
+        currentPath: {
+          id,
+          tool,
+          points: point ? [point] : [],
+          color,
+          size
+        }
+      });
+    }
+  },
+
+  updateShape: (endPoint: Point) => {
+    set((state) => {
+      if (!state.currentPath?.shapeData) return state;
+
+      return {
+        currentPath: {
+          ...state.currentPath,
+          shapeData: {
+            ...state.currentPath.shapeData,
+            endPoint
+          }
+        }
+      };
     });
   },
+
+  setShapeStyle: (style: ShapeStyle) => set({ shapeStyle: style }),
   
   addPoint: (point) => 
     set((state) => ({
