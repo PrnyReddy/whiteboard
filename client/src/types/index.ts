@@ -40,4 +40,12 @@ export interface DrawingData {
 export interface UserData {
   id: string;
   color: string;
+  isDrawing?: boolean;
+  lastActive?: number;
+  name?: string;
+}
+
+export interface UserPresence {
+  users: UserData[];
+  activeUser?: string;
 }

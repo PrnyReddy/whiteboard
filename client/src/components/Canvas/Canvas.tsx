@@ -3,6 +3,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { DrawingData, Point, DrawingTool } from '@/types';
 import styles from './Canvas.module.css';
 import { useStore } from '@/store/useStore';
+import UsersList from '../UI/UsersList';
 
 interface CanvasProps {
   width?: number;
@@ -30,7 +31,15 @@ const Canvas: React.FC<CanvasProps> = ({
     setColor
   } = useStore();
 
-  const { initSocket, emitDrawing, subscribeToDrawing, userColor } = useSocket();
+  const { 
+    initSocket, 
+    emitDrawing, 
+    subscribeToDrawing, 
+    userColor,
+    users,
+    startDrawing: notifyStartDrawing,
+    stopDrawing: notifyStopDrawing 
+  } = useSocket();
 
   useEffect(() => {
     if (userColor) {
@@ -172,6 +181,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     isDrawing.current = true;
+    notifyStartDrawing();
     const canvas = canvasRef.current;
     if (!canvas) return;
   
@@ -234,17 +244,22 @@ const Canvas: React.FC<CanvasProps> = ({
     isDrawing.current = false;
     startPoint.current = null;
     endPath();
-  }, [tool, endPath, handleShapeComplete]);
+    notifyStopDrawing();
+  }, [tool, endPath, handleShapeComplete, notifyStopDrawing]);
 
   return (
     <div className={styles.canvasContainer}>
+      <UsersList users={users} />
       <canvas
         ref={canvasRef}
         className={styles.canvas}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+      onMouseLeave={(e) => {
+        notifyStopDrawing();
+        handleMouseUp(e);
+      }}
       />
     </div>
   );
