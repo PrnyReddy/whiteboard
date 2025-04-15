@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { DrawingData, UserData } from '@/types';
 
@@ -7,6 +7,7 @@ const SOCKET_URL = 'http://localhost:3001';
 export const useSocket = () => {
   const socketRef = useRef<Socket | null>(null);
   const [userColor, setUserColor] = useState<string>('#000000');
+  const [users, setUsers] = useState<UserData[]>([]);
 
   const initSocket = useCallback(() => {
     if (socketRef.current?.connected) {
@@ -23,8 +24,21 @@ export const useSocket = () => {
       });
 
       socketRef.current.on('client-ready', (userData: UserData) => {
-        console.log('Received user color:', userData.color);
+        console.log('Received user data:', userData);
         setUserColor(userData.color);
+      });
+
+      socketRef.current.on('users-updated', (updatedUsers: UserData[]) => {
+        console.log('Users updated:', updatedUsers);
+        setUsers(updatedUsers);
+      });
+
+      socketRef.current.on('user-joined', (userData: UserData) => {
+        console.log('User joined:', userData);
+      });
+
+      socketRef.current.on('user-left', (userId: string) => {
+        console.log('User left:', userId);
       });
 
       socketRef.current.on('client-count', (count: number) => {
@@ -70,10 +84,32 @@ export const useSocket = () => {
     };
   }, []);
 
+  const setName = useCallback((name: string) => {
+    if (socketRef.current) {
+      socketRef.current.emit('set-name', name);
+    }
+  }, []);
+
+  const startDrawing = useCallback(() => {
+    if (socketRef.current) {
+      socketRef.current.emit('start-drawing');
+    }
+  }, []);
+
+  const stopDrawing = useCallback(() => {
+    if (socketRef.current) {
+      socketRef.current.emit('stop-drawing');
+    }
+  }, []);
+
   return {
     initSocket,
     emitDrawing,
     subscribeToDrawing,
-    userColor
+    userColor,
+    users,
+    setName,
+    startDrawing,
+    stopDrawing
   };
 };
