@@ -17,9 +17,8 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
   }
 });
 
-const rooms = new Map<string, Set<string>>();
 
-const userColors = new Map<string, string>();
+const users = new Map<string, UserData>();
 
 const getRandomColor = () => {
   const colors = [
@@ -30,41 +29,87 @@ const getRandomColor = () => {
   return colors[Math.floor(Math.random() * colors.length)];
 };
 
+const broadcastUsers = () => {
+  io.emit('users-updated', Array.from(users.values()));
+};
+
+const updateUserActivity = (userId: string) => {
+  const user = users.get(userId);
+  if (user) {
+    user.lastActive = Date.now();
+    users.set(userId, user);
+  }
+};
+
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
-  
   const userColor = getRandomColor();
-  userColors.set(socket.id, userColor);
-  socket.data.userColor = userColor;
-
-  socket.emit('client-ready', {
+  const userData: UserData = {
     id: socket.id,
-    color: userColor
-  } as UserData);
+    color: userColor,
+    isDrawing: false,
+    lastActive: Date.now(),
+    name: `User ${users.size + 1}`
+  };
 
+  users.set(socket.id, userData);
+  socket.data.userColor = userColor;
+  socket.emit('client-ready', userData);
+  socket.broadcast.emit('user-joined', userData);
+  broadcastUsers();
   socket.on('draw', (data: DrawingData) => {
-    const drawingWithColor = {
-      ...data,
-      color: data.color || socket.data.userColor || '#000000'
-    };
-    socket.broadcast.emit('drawing', drawingWithColor);
+    updateUserActivity(socket.id);
+    socket.broadcast.emit('drawing', data);
+  });
+
+  socket.on('start-drawing', () => {
+    const user = users.get(socket.id);
+    if (user) {
+      user.isDrawing = true;
+      users.set(socket.id, user);
+      socket.broadcast.emit('user-started-drawing', socket.id);
+      broadcastUsers();
+    }
+  });
+
+  socket.on('stop-drawing', () => {
+    const user = users.get(socket.id);
+    if (user) {
+      user.isDrawing = false;
+      users.set(socket.id, user);
+      socket.broadcast.emit('user-stopped-drawing', socket.id);
+      broadcastUsers();
+    }
+  });
+
+  socket.on('set-name', (name: string) => {
+    const user = users.get(socket.id);
+    if (user) {
+      user.name = name;
+      users.set(socket.id, user);
+      broadcastUsers();
+    }
   });
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
-    userColors.delete(socket.id);
-
-    if (socket.data.roomId) {
-      const room = rooms.get(socket.data.roomId);
-      if (room) {
-        room.delete(socket.id);
-        if (room.size === 0) {
-          rooms.delete(socket.data.roomId);
-        }
-      }
-    }
+    users.delete(socket.id);
+    socket.broadcast.emit('user-left', socket.id);
+    broadcastUsers();
   });
 });
+
+const INACTIVE_TIMEOUT = 5 * 60 * 1000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, user] of users.entries()) {
+    if (now - (user.lastActive || 0) > INACTIVE_TIMEOUT) {
+      users.delete(userId);
+      io.emit('user-left', userId);
+      broadcastUsers();
+    }
+  }
+}, 60000);
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
