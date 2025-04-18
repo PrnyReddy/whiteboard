@@ -34,6 +34,7 @@ export interface ClientToServerEvents {
   'start-drawing': () => void;
   'stop-drawing': () => void;
   'set-name': (name: string) => void;
+  'activity': () => void;
 }
 
 export interface InterServerEvents {
@@ -51,5 +52,5 @@ export interface UserData {
   color: string;
   isDrawing?: boolean;
   lastActive?: number;
-  name?: string;
+  name: string;
 }

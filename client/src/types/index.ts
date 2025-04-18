@@ -42,7 +42,7 @@ export interface UserData {
   color: string;
   isDrawing?: boolean;
   lastActive?: number;
-  name?: string;
+  name: string;
 }
 
 export interface UserPresence {

@@ -32,13 +32,13 @@ const Canvas: React.FC<CanvasProps> = ({
   } = useStore();
 
   const { 
-    initSocket, 
     emitDrawing, 
     subscribeToDrawing, 
     userColor,
     users,
     startDrawing: notifyStartDrawing,
-    stopDrawing: notifyStopDrawing 
+    stopDrawing: notifyStopDrawing,
+    updateActivity 
   } = useSocket();
 
   useEffect(() => {
@@ -150,10 +150,6 @@ const Canvas: React.FC<CanvasProps> = ({
     });
   }, [setRemotePath]);
 
-  useEffect(() => {
-    const cleanup = initSocket();
-    return cleanup;
-  }, [initSocket]);
 
   useEffect(() => {
     const unsubscribe = subscribeToDrawing(handleRemoteDrawing);
@@ -182,6 +178,7 @@ const Canvas: React.FC<CanvasProps> = ({
     e.preventDefault();
     isDrawing.current = true;
     notifyStartDrawing();
+    updateActivity();
     const canvas = canvasRef.current;
     if (!canvas) return;
   
@@ -195,6 +192,7 @@ const Canvas: React.FC<CanvasProps> = ({
   }, [startPath]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    updateActivity();
     e.preventDefault();
     if (!isDrawing.current || !currentPath || !startPoint.current) return;
 
