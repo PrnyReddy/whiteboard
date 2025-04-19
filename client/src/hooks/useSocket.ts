@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { DrawingData, UserData } from '@/types';
+import { 
+  DrawingData, 
+  UserData, 
+  ClientToServerEvents, 
+  ServerToClientEvents 
+} from '@/types';
 
 const SOCKET_URL = 'http://localhost:3001';
-let globalSocket: Socket | null = null;
+let globalSocket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 
 export const useSocket = () => {
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const [userColor, setUserColor] = useState<string>('#000000');
   const [users, setUsers] = useState<UserData[]>([]);
 
@@ -21,85 +26,82 @@ export const useSocket = () => {
         reconnectionDelayMax: 5000,
         timeout: 10000
       });
-      console.log('Created new global socket, ID:', globalSocket.id);
+      console.log('Created new global socket');
     }
-
-    globalSocket.io.on('reconnect', () => {
-      console.log('Socket reconnected, ID:', globalSocket?.id);
-      globalSocket?.emit('client-ready');
-    });
-
-    globalSocket.io.on('reconnect_attempt', () => {
-      console.log('Attempting to reconnect...');
-    });
-
-    globalSocket.io.on('reconnect_failed', () => {
-      console.log('Reconnection failed');
-      globalSocket?.disconnect();
-      globalSocket = null;
-    });
 
     socketRef.current = globalSocket;
 
     const handleConnect = () => {
-      const socketId = socketRef.current?.id;
-      console.log('Connected to server with ID:', socketId);
-      console.log('Active users:', users.length);
+      console.log('Connected to server with ID:', socketRef.current?.id);
+      socketRef.current?.emit('client-ready');
+    };
+
+    const handleReconnect = () => {
+      console.log('Reconnected, requesting latest state');
       socketRef.current?.emit('client-ready');
     };
 
     const handleClientReady = (userData: UserData) => {
-      console.log('Received user data:', userData);
+      console.log('Received initial user data:', userData);
       setUserColor(userData.color);
+      setUsers(prevUsers => {
+        const newUsers = prevUsers.filter(u => u.id !== userData.id);
+        return [...newUsers, userData];
+      });
     };
 
     const handleUsersUpdate = (updatedUsers: UserData[]) => {
-      console.log('Users updated:', updatedUsers);
+      console.log('Users list updated:', updatedUsers);
       setUsers(updatedUsers);
     };
 
     const handleUserJoin = (userData: UserData) => {
-      console.log('User joined:', userData.name, 'ID:', userData.id);
-      console.log('Updated users count:', users.length + 1);
+      console.log('User joined:', userData.name);
+      setUsers(prevUsers => {
+        const filteredUsers = prevUsers.filter(u => u.id !== userData.id);
+        return [...filteredUsers, userData];
+      });
     };
 
     const handleUserLeave = (userId: string) => {
       console.log('User left:', userId);
-      console.log('Updated users count:', users.length - 1);
+      setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
     };
 
     const handleError = (error: Error) => {
-      console.error('Socket connection error:', error);
+      console.error('Socket error:', error);
     };
 
-    socketRef.current.on('connect', handleConnect);
-    socketRef.current.on('client-ready', handleClientReady);
-    socketRef.current.on('users-updated', handleUsersUpdate);
-    socketRef.current.on('user-joined', handleUserJoin);
-    socketRef.current.on('user-left', handleUserLeave);
-    socketRef.current.on('connect_error', handleError);
+    const socket = socketRef.current;
+    if (socket) {
+      socket.on('connect', handleConnect);
+      socket.io.on('reconnect', handleReconnect);
+      socket.on('client-ready', handleClientReady);
+      socket.on('users-updated', handleUsersUpdate);
+      socket.on('user-joined', handleUserJoin);
+      socket.on('user-left', handleUserLeave);
+      socket.on('connect_error', handleError);
 
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.off('connect', handleConnect);
-        socketRef.current.off('client-ready', handleClientReady);
-        socketRef.current.off('users-updated', handleUsersUpdate);
-        socketRef.current.off('user-joined', handleUserJoin);
-        socketRef.current.off('user-left', handleUserLeave);
-        socketRef.current.off('connect_error', handleError);
-        socketRef.current = null;
-      }
-      setUsers([]);
-      setUserColor('#000000');
-    };
+      return () => {
+        socket.off('connect', handleConnect);
+        socket.io.off('reconnect', handleReconnect);
+        socket.off('client-ready', handleClientReady);
+        socket.off('users-updated', handleUsersUpdate);
+        socket.off('user-joined', handleUserJoin);
+        socket.off('user-left', handleUserLeave);
+        socket.off('connect_error', handleError);
+      };
+    }
+    return () => {};
   }, []);
 
   useEffect(() => {
     const cleanup = setupSocket();
     return () => {
-      cleanup();
-      if (globalSocket && document.visibilityState === 'hidden') {
-        globalSocket.disconnect();
+      if (cleanup) cleanup();
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
         globalSocket = null;
       }
     };
@@ -107,28 +109,20 @@ export const useSocket = () => {
 
   const emitDrawing = useCallback((drawingData: DrawingData) => {
     if (socketRef.current) {
-      console.log('Emitting drawing data:', drawingData);
       socketRef.current.emit('draw', drawingData);
-    } else {
-      console.warn('Socket not initialized');
     }
   }, []);
 
   const subscribeToDrawing = useCallback((callback: (data: DrawingData) => void) => {
     if (!socketRef.current) return () => {};
 
-    console.log('Subscribing to drawing events');
     const handleDrawing = (data: DrawingData) => {
-      console.log('Received drawing data:', data);
       callback(data);
     };
+
     socketRef.current.on('drawing', handleDrawing);
-    
     return () => {
-      if (socketRef.current) {
-        console.log('Unsubscribing from drawing events');
-        socketRef.current.off('drawing', handleDrawing);
-      }
+      socketRef.current?.off('drawing', handleDrawing);
     };
   }, []);
 
@@ -165,6 +159,7 @@ export const useSocket = () => {
     setName,
     startDrawing,
     stopDrawing,
-    updateActivity
+    updateActivity,
+    socket: socketRef.current
   };
 };

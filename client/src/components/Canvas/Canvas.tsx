@@ -1,4 +1,5 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
+import { UserCursor } from '../UI/UserCursor';
 import { useSocket } from '@/hooks/useSocket';
 import { DrawingData, Point, DrawingTool } from '@/types';
 import styles from './Canvas.module.css';
@@ -38,7 +39,8 @@ const Canvas: React.FC<CanvasProps> = ({
     users,
     startDrawing: notifyStartDrawing,
     stopDrawing: notifyStopDrawing,
-    updateActivity 
+    updateActivity,
+    socket: socketRef 
   } = useSocket();
 
   useEffect(() => {
@@ -189,17 +191,41 @@ const Canvas: React.FC<CanvasProps> = ({
     const point = { x, y };
     startPoint.current = point;
     startPath(point);
-  }, [startPath]);
+  }, [startPath, notifyStartDrawing, updateActivity]);
+
+  const [otherCursors, setOtherCursors] = useState<Record<string, Point>>({});
+  
+  useEffect(() => {
+    const handleCursorUpdate = ({ userId, position }: { userId: string, position: Point }) => {
+      if (userId !== socketRef?.id) {
+        setOtherCursors(prev => ({ ...prev, [userId]: position }));
+      }
+    };
+
+    socketRef?.on('cursor-updated', handleCursorUpdate);
+    
+    return () => {
+      socketRef?.off('cursor-updated', handleCursorUpdate);
+    };
+  }, [socketRef]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     updateActivity();
     e.preventDefault();
-    if (!isDrawing.current || !currentPath || !startPoint.current) return;
-
+  
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
+    const position = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+
+    socketRef?.emit('cursor-move', position);
+
+    if (!isDrawing.current || !currentPath || !startPoint.current) return;
+
     const currentPoint = {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
@@ -217,7 +243,7 @@ const Canvas: React.FC<CanvasProps> = ({
         tool: currentPath.tool
       });
     }
-  }, [tool, currentPath, addPoint, updateShape, draw, emitDrawing]);
+  }, [tool, currentPath, addPoint, updateShape, draw, emitDrawing, socketRef, updateActivity]);
 
   const handleShapeComplete = useCallback(() => {
     if (!currentPath?.shapeData) return;
@@ -243,12 +269,23 @@ const Canvas: React.FC<CanvasProps> = ({
     startPoint.current = null;
     endPath();
     notifyStopDrawing();
-  }, [tool, endPath, handleShapeComplete, notifyStopDrawing]);
+  }, [tool, endPath, handleShapeComplete, notifyStopDrawing, updateActivity]);
 
   return (
-    <div className={styles.canvasContainer}>
-      <UsersList users={users} />
-      <canvas
+      <div className={styles.canvasContainer}>
+        <UsersList users={users} />
+        {Object.entries(otherCursors).map(([userId, position]) => {
+          const user = users.find(u => u.id === userId);
+          if (!user) return null;
+          return (
+            <UserCursor 
+              key={userId}
+              user={user}
+              position={position}
+            />
+          );
+        })}
+        <canvas
         ref={canvasRef}
         className={styles.canvas}
         onMouseDown={handleMouseDown}

@@ -6,7 +6,8 @@ import {
   InterServerEvents, 
   SocketData,
   DrawingData,
-  UserData 
+  UserData,
+  Point 
 } from './types/events';
 
 const httpServer = createServer();
@@ -113,6 +114,15 @@ class UserManager {
     return userData;
   }
 
+  updateCursorPosition(socketId: string, position: Point) {
+    const user = this.users.get(socketId);
+    if (user) {
+      user.cursorPosition = position;
+      user.lastActive = Date.now();
+      this.users.set(socketId, user);
+    }
+  }
+
   handleDisconnect(socketId: string) {
     if (this.disconnectTimers.has(socketId)) {
       clearTimeout(this.disconnectTimers.get(socketId));
@@ -206,6 +216,14 @@ io.on('connection', (socket) => {
     userManager.updateActivity(socket.id);
   });
 
+  socket.on('cursor-move', (position: Point) => {
+    userManager.updateCursorPosition(socket.id, position);
+    socket.broadcast.emit('cursor-updated', {
+      userId: socket.id,
+      position
+    });
+  });
+
   socket.on('draw', (data: DrawingData) => {
     userManager.updateActivity(socket.id);
     socket.broadcast.emit('drawing', data);
@@ -238,8 +256,8 @@ io.on('connection', (socket) => {
   });
 });
 
-const CLEANUP_INTERVAL = 60000; // 1 minute
-const INACTIVE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+const CLEANUP_INTERVAL = 60000;
+const INACTIVE_TIMEOUT = 5 * 60 * 1000;
 
 setInterval(() => {
   const inactiveIds = userManager.cleanup(INACTIVE_TIMEOUT);

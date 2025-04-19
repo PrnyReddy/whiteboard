@@ -17,6 +17,11 @@ export interface DrawingData {
   shapeData?: ShapeData;
 }
 
+export interface CursorUpdate {
+  userId: string;
+  position: Point;
+}
+
 export interface ServerToClientEvents {
   'drawing': (data: DrawingData) => void;
   'client-count': (count: number) => void;
@@ -26,6 +31,7 @@ export interface ServerToClientEvents {
   'user-started-drawing': (userId: string) => void;
   'user-stopped-drawing': (userId: string) => void;
   'users-updated': (users: UserData[]) => void;
+  'cursor-updated': (data: CursorUpdate) => void;
 }
 
 export interface ClientToServerEvents {
@@ -35,6 +41,7 @@ export interface ClientToServerEvents {
   'stop-drawing': () => void;
   'set-name': (name: string) => void;
   'activity': () => void;
+  'cursor-move': (position: Point) => void;
 }
 
 export interface InterServerEvents {
@@ -53,4 +60,5 @@ export interface UserData {
   isDrawing?: boolean;
   lastActive?: number;
   name: string;
+  cursorPosition?: Point;
 }
