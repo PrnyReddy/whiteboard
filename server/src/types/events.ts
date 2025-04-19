@@ -1,12 +1,15 @@
-export interface Point {
+export type Point = {
   x: number;
   y: number;
-}
+};
+
+export type DrawingTool = 'pen' | 'eraser' | 'rectangle' | 'circle';
+export type ShapeStyle = 'stroke' | 'fill';
 
 export interface ShapeData {
   startPoint: Point;
   endPoint: Point;
-  style: 'stroke' | 'fill';
+  style: ShapeStyle;
 }
 
 export interface DrawingData {
@@ -17,9 +20,13 @@ export interface DrawingData {
   shapeData?: ShapeData;
 }
 
-export interface CursorUpdate {
-  userId: string;
-  position: Point;
+export interface UserData {
+  id: string;
+  color: string;
+  name: string;
+  isDrawing?: boolean;
+  lastActive?: number;
+  cursorPosition?: Point;
 }
 
 export interface ServerToClientEvents {
@@ -31,7 +38,7 @@ export interface ServerToClientEvents {
   'user-started-drawing': (userId: string) => void;
   'user-stopped-drawing': (userId: string) => void;
   'users-updated': (users: UserData[]) => void;
-  'cursor-updated': (data: CursorUpdate) => void;
+  'cursor-updated': (data: { userId: string; position: Point }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -42,6 +49,7 @@ export interface ClientToServerEvents {
   'set-name': (name: string) => void;
   'activity': () => void;
   'cursor-move': (position: Point) => void;
+  'color-change': (color: string) => void;
 }
 
 export interface InterServerEvents {
@@ -50,15 +58,4 @@ export interface InterServerEvents {
 
 export interface SocketData {
   userId: string;
-  userColor?: string;
-  roomId?: string;
-}
-
-export interface UserData {
-  id: string;
-  color: string;
-  isDrawing?: boolean;
-  lastActive?: number;
-  name: string;
-  cursorPosition?: Point;
 }

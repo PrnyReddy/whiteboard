@@ -2,6 +2,7 @@
 
 import React from 'react';
 import styles from './Toolbar.module.css';
+import CircularColorPicker from './CircularColorPicker';
 import { useStore } from '@/store/useStore';
 import { DrawingTool, ShapeStyle } from '@/types';
 
@@ -56,6 +57,7 @@ const Toolbar = () => {
 
   return (
     <div className={styles.toolbar}>
+      <CircularColorPicker />
       <div className={styles.toolSection}>
         {tools.map(({ name, icon }) => (
           <button

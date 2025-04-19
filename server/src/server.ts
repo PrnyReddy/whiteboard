@@ -114,16 +114,46 @@ class UserManager {
     return userData;
   }
 
-  updateCursorPosition(socketId: string, position: Point) {
+  updateUser(socketId: string, updateFn: (user: UserData) => void): void {
     const user = this.users.get(socketId);
     if (user) {
-      user.cursorPosition = position;
-      user.lastActive = Date.now();
+      updateFn(user);
       this.users.set(socketId, user);
     }
   }
 
-  handleDisconnect(socketId: string) {
+  setColor(socketId: string, color: string): void {
+    this.updateUser(socketId, user => {
+      user.color = color;
+    });
+  }
+
+  setName(socketId: string, name: string): void {
+    this.updateUser(socketId, user => {
+      user.name = name;
+    });
+  }
+
+  setDrawingState(socketId: string, isDrawing: boolean): void {
+    this.updateUser(socketId, user => {
+      user.isDrawing = isDrawing;
+    });
+  }
+
+  updateCursorPosition(socketId: string, position: Point): void {
+    this.updateUser(socketId, user => {
+      user.cursorPosition = position;
+      user.lastActive = Date.now();
+    });
+  }
+
+  updateActivity(socketId: string): void {
+    this.updateUser(socketId, user => {
+      user.lastActive = Date.now();
+    });
+  }
+
+  handleDisconnect(socketId: string): void {
     if (this.disconnectTimers.has(socketId)) {
       clearTimeout(this.disconnectTimers.get(socketId));
       this.disconnectTimers.delete(socketId);
@@ -136,7 +166,7 @@ class UserManager {
     this.disconnectTimers.set(socketId, timer);
   }
 
-  removeUser(socketId: string) {
+  removeUser(socketId: string): void {
     if (this.disconnectTimers.has(socketId)) {
       clearTimeout(this.disconnectTimers.get(socketId));
       this.disconnectTimers.delete(socketId);
@@ -161,31 +191,7 @@ class UserManager {
     return Array.from(this.users.values());
   }
 
-  updateActivity(socketId: string) {
-    const user = this.users.get(socketId);
-    if (user) {
-      user.lastActive = Date.now();
-      this.users.set(socketId, user);
-    }
-  }
-
-  setDrawingState(socketId: string, isDrawing: boolean) {
-    const user = this.users.get(socketId);
-    if (user) {
-      user.isDrawing = isDrawing;
-      this.users.set(socketId, user);
-    }
-  }
-
-  setName(socketId: string, name: string) {
-    const user = this.users.get(socketId);
-    if (user) {
-      user.name = name;
-      this.users.set(socketId, user);
-    }
-  }
-
-  cleanup(timeout: number) {
+  cleanup(timeout: number): string[] {
     const now = Date.now();
     const inactiveIds: string[] = [];
 
@@ -209,8 +215,6 @@ io.on('connection', (socket) => {
   socket.emit('client-ready', userData);
   socket.broadcast.emit('user-joined', userData);
   io.emit('users-updated', userManager.getAllUsers());
-
-  console.log('Users after connection:', userManager.getAllUsers().map(u => u.name));
 
   socket.on('activity', () => {
     userManager.updateActivity(socket.id);
@@ -246,13 +250,16 @@ io.on('connection', (socket) => {
     io.emit('users-updated', userManager.getAllUsers());
   });
 
+  socket.on('color-change', (color: string) => {
+    userManager.setColor(socket.id, color);
+    io.emit('users-updated', userManager.getAllUsers());
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
     userManager.handleDisconnect(socket.id);
-    console.log('Starting disconnect timer for:', socket.id);
     socket.broadcast.emit('user-left', socket.id);
     io.emit('users-updated', userManager.getAllUsers());
-    console.log('Users after disconnect:', userManager.getAllUsers().map(u => u.name));
   });
 });
 
@@ -266,7 +273,6 @@ setInterval(() => {
       io.emit('user-left', id);
     });
     io.emit('users-updated', userManager.getAllUsers());
-    console.log('Cleaned up inactive users. Remaining:', userManager.getAllUsers().map(u => u.name));
   }
 }, CLEANUP_INTERVAL);
 

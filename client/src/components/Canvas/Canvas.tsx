@@ -178,6 +178,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+    e.stopPropagation();
     isDrawing.current = true;
     notifyStartDrawing();
     updateActivity();
@@ -212,6 +213,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     updateActivity();
     e.preventDefault();
+    e.stopPropagation();
   
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -259,6 +261,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!isDrawing.current) return;
     
     if (tool === 'rectangle' || tool === 'circle') {

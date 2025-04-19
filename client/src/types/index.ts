@@ -40,14 +40,10 @@ export interface DrawingData {
 export interface UserData {
   id: string;
   color: string;
+  name: string;
   isDrawing?: boolean;
   lastActive?: number;
-  name: string;
-}
-
-export interface CursorUpdate {
-  userId: string;
-  position: Point;
+  cursorPosition?: Point;
 }
 
 export interface ServerToClientEvents {
@@ -59,7 +55,7 @@ export interface ServerToClientEvents {
   'user-started-drawing': (userId: string) => void;
   'user-stopped-drawing': (userId: string) => void;
   'users-updated': (users: UserData[]) => void;
-  'cursor-updated': (data: CursorUpdate) => void;
+  'cursor-updated': (data: { userId: string; position: Point }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -70,6 +66,7 @@ export interface ClientToServerEvents {
   'set-name': (name: string) => void;
   'activity': () => void;
   'cursor-move': (position: Point) => void;
+  'color-change': (color: string) => void;
 }
 
 export interface UserPresence {
