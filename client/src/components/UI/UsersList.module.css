@@ -39,13 +39,23 @@
 }
 
 .userColor {
-  width: 12px;
-  height: 12px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  margin-right: 8px;
+  margin-right: 10px;
   border: 2px solid #ffffff;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
+  transform-origin: center;
+}
+
+.userColor:not(:hover) {
+  animation: colorChange 0.3s ease;
+}
+
+@keyframes colorChange {
+  0% { transform: scale(1.2); }
+  100% { transform: scale(1); }
 }
 
 .userName {
