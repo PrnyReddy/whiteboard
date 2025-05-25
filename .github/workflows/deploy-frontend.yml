@@ -44,13 +44,16 @@ jobs:
       - name: Create .nojekyll file
         run: touch out/.nojekyll
 
+      - name: Debug output
+        run: ls -al out
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: out
+          path: client/out
 
   deploy:
     needs: build
