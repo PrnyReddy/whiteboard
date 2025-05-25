@@ -6,7 +6,7 @@ A real-time collaborative whiteboard using Next.js and Socket.IO.
 
 1. Clone the repository
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/PrnyReddy/whiteboard.git
 cd whiteboard
 ```
 
