@@ -3,9 +3,8 @@ services:
     name: whiteboard-server
     env: docker
     plan: free
-    dockerfilePath: ./server/Dockerfile
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
+    dockerfilePath: server/Dockerfile
+    region: oregon
     envVars:
       - key: NODE_ENV
         value: production
@@ -15,5 +14,3 @@ services:
         sync: false
     healthCheckPath: /health
     autoDeploy: true
-    numInstances: 1
-    pullRequestPreviewsEnabled: false
