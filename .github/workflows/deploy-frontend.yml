@@ -42,15 +42,15 @@ jobs:
           NEXT_PUBLIC_SOCKET_URL: ${{ secrets.NEXT_PUBLIC_SOCKET_URL }}
 
       - name: Create .nojekyll file
-        run: touch out/.nojekyll
+        run: touch ./out/.nojekyll
 
-      - name: Setup Pages
+      - name: Configure Pages
         uses: actions/configure-pages@v3
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v2
         with:
-          path: out
+          path: ./client/out
 
   deploy:
     needs: build
