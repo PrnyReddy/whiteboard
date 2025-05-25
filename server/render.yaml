@@ -1,8 +1,9 @@
 services:
   - type: web
     name: whiteboard-server
-    env: node
+    env: docker
     plan: free
+    dockerfilePath: ./server/Dockerfile
     buildCommand: npm ci && npm run build
     startCommand: npm start
     envVars:
