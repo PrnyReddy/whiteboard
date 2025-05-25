@@ -7,7 +7,7 @@ import {
   ServerToClientEvents 
 } from '@/types';
 
-const SOCKET_URL = 'http://localhost:3001';
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
 let globalSocket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 
 export const useSocket = () => {
