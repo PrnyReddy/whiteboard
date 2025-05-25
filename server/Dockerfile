@@ -11,6 +11,6 @@ COPY ./server/src ./src
 RUN npm install
 RUN npm run build
 
-EXPOSE 3001
+EXPOSE ${PORT}
 
 CMD ["npm", "start"]
