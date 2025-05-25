@@ -40,8 +40,9 @@ jobs:
         run: touch .nojekyll
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-artifact@v2
         with:
+          name: frontend
           path: ./client/out
 
       - name: Deploy to GitHub Pages
