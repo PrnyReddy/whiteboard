@@ -1,16 +1,20 @@
 FROM node:18-alpine
 
-WORKDIR /app
+WORKDIR /usr/src/app
 
-COPY package*.json ./
+COPY ./server/package*.json ./
 
+# Install all dependencies
 RUN npm ci
 
-COPY tsconfig.json ./
-COPY src ./src
+# Copy source files
+COPY ./server/tsconfig.json ./
+COPY ./server/src ./src
 
+# Build TypeScript
 RUN npm run build
 
+# Install only production dependencies
 RUN npm ci --only=production
 
 EXPOSE 3001
