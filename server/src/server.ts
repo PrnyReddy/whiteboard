@@ -10,10 +10,19 @@ import {
   Point 
 } from './types/events';
 
-const httpServer = createServer();
+const httpServer = createServer((req, res) => {
+  if (req.url === '/healthz') {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+});
+
 const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(httpServer, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
     methods: ["GET", "POST"]
   }
 });
@@ -277,6 +286,6 @@ setInterval(() => {
 }, CLEANUP_INTERVAL);
 
 const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`WebSocket server running on port ${PORT}`);
 });
