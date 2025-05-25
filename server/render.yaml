@@ -3,14 +3,11 @@ services:
     name: whiteboard-server
     env: docker
     plan: free
-    dockerfilePath: server/Dockerfile
     region: oregon
+    dockerfilePath: server/Dockerfile
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3001
-      - key: CORS_ORIGIN
-        sync: false
     healthCheckPath: /health
-    autoDeploy: true
