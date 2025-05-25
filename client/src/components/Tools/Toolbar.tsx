@@ -33,24 +33,26 @@ const Toolbar = () => {
   };
 
   React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey) {
-        if (e.key.toLowerCase() === 'z') {
-          e.preventDefault();
-          if (e.shiftKey) {
+    if (typeof window !== 'undefined') {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.ctrlKey) {
+          if (e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) {
+              redo();
+            } else {
+              undo();
+            }
+          } else if (e.key === 'y') {
+            e.preventDefault();
             redo();
-          } else {
-            undo();
           }
-        } else if (e.key === 'y') {
-          e.preventDefault();
-          redo();
         }
-      }
-    };
+      };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
   }, [undo, redo]);
 
   const isShapeTool = tool === 'rectangle' || tool === 'circle';

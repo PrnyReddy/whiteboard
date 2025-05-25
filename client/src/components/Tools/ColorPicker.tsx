@@ -13,14 +13,16 @@ const ColorPicker: React.FC = () => {
   const containerRef = useClickOutside(handleClose);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showPicker) {
-        setShowPicker(false);
-      }
-    };
+    if (typeof window !== 'undefined') {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && showPicker) {
+          setShowPicker(false);
+        }
+      };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
   }, [showPicker]);
 
   return (

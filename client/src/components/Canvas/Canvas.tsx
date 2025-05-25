@@ -12,8 +12,8 @@ interface CanvasProps {
 }
 
 const Canvas: React.FC<CanvasProps> = ({
-  width = window.innerWidth,
-  height = window.innerHeight,
+  width,
+  height,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -48,6 +48,14 @@ const Canvas: React.FC<CanvasProps> = ({
       setColor(userColor);
     }
   }, [userColor, setColor]);
+
+  const [clientWidth, setClientWidth] = useState<number>(0);
+  const [clientHeight, setClientHeight] = useState<number>(0);
+
+  useEffect(() => {
+    setClientWidth(window.innerWidth);
+    setClientHeight(window.innerHeight);
+  }, [])
 
   const drawShape = useCallback((
     context: CanvasRenderingContext2D,
@@ -166,15 +174,15 @@ const Canvas: React.FC<CanvasProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = width || clientWidth;
+    canvas.height = height || clientHeight;
     const context = canvas.getContext('2d');
     if (!context) return;
 
     context.lineCap = 'round';
     context.lineJoin = 'round';    
     contextRef.current = context;
-  }, [width, height]);
+  }, [width, height, clientWidth, clientHeight]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
