@@ -1,10 +1,11 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { UserCursor } from '../UI/UserCursor';
 import { useSocket } from '@/hooks/useSocket';
-import { DrawingData, Point, DrawingTool } from '@/types';
+import { DrawingData, Point, DrawingTool, Path } from '@/types';
 import styles from './Canvas.module.css';
 import { useStore } from '@/store/useStore';
 import UsersList from '../UI/UsersList';
+import throttle from 'lodash/throttle';
 
 interface CanvasProps {
   width?: number;
@@ -19,6 +20,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const isDrawing = useRef(false);
   const startPoint = useRef<Point | null>(null);
+  const cursorRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const { 
     tool,
@@ -29,12 +31,16 @@ const Canvas: React.FC<CanvasProps> = ({
     updateShape, 
     endPath,
     setRemotePath,
+    appendRemotePoint,
+    setRemotePaths,
     setColor
   } = useStore();
 
   const { 
     emitDrawing, 
+    savePath,
     subscribeToDrawing, 
+    subscribeToRoomState,
     userColor,
     users,
     startDrawing: notifyStartDrawing,
@@ -55,7 +61,7 @@ const Canvas: React.FC<CanvasProps> = ({
   useEffect(() => {
     setClientWidth(window.innerWidth);
     setClientHeight(window.innerHeight);
-  }, [])
+  }, []);
 
   const drawShape = useCallback((
     context: CanvasRenderingContext2D,
@@ -149,22 +155,42 @@ const Canvas: React.FC<CanvasProps> = ({
   }, [paths, currentPath, drawShape]);
 
   const handleRemoteDrawing = useCallback((data: DrawingData) => {
-    console.log('Received remote drawing:', data);
-    setRemotePath({
-      id: Date.now().toString(),
-      tool: data.tool as DrawingTool,
-      points: data.points,
-      color: data.color,
-      size: data.size,
-      shapeData: data.shapeData
-    });
-  }, [setRemotePath]);
-
+    if (data.point) {
+      const state = useStore.getState();
+      const pathExists = state.paths.some(p => p.id === data.id);
+      if (!pathExists) {
+        setRemotePath({
+          id: data.id,
+          tool: data.tool as DrawingTool,
+          points: data.points || [],
+          color: data.color,
+          size: data.size,
+          shapeData: data.shapeData
+        });
+      }
+      appendRemotePoint(data.id, data.point);
+    } else {
+      setRemotePath({
+        id: data.id,
+        tool: data.tool as DrawingTool,
+        points: data.points,
+        color: data.color,
+        size: data.size,
+        shapeData: data.shapeData
+      });
+    }
+  }, [setRemotePath, appendRemotePoint]);
 
   useEffect(() => {
-    const unsubscribe = subscribeToDrawing(handleRemoteDrawing);
-    return unsubscribe;
-  }, [subscribeToDrawing, handleRemoteDrawing]);
+    const unsubDraw = subscribeToDrawing(handleRemoteDrawing);
+    const unsubRoom = subscribeToRoomState((pathsData) => {
+      setRemotePaths(pathsData as Path[]);
+    });
+    return () => {
+      unsubDraw();
+      unsubRoom();
+    };
+  }, [subscribeToDrawing, subscribeToRoomState, handleRemoteDrawing, setRemotePaths]);
 
   useEffect(() => {
     draw();
@@ -202,21 +228,28 @@ const Canvas: React.FC<CanvasProps> = ({
     startPath(point);
   }, [startPath, notifyStartDrawing, updateActivity]);
 
-  const [otherCursors, setOtherCursors] = useState<Record<string, Point>>({});
-  
   useEffect(() => {
     const handleCursorUpdate = ({ userId, position }: { userId: string, position: Point }) => {
       if (userId !== socketRef?.id) {
-        setOtherCursors(prev => ({ ...prev, [userId]: position }));
+        const el = cursorRefs.current[userId];
+        if (el) {
+          el.style.transform = `translate(${position.x}px, ${position.y}px)`;
+        }
       }
     };
-
     socketRef?.on('cursor-updated', handleCursorUpdate);
-    
     return () => {
       socketRef?.off('cursor-updated', handleCursorUpdate);
     };
   }, [socketRef]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const throttledEmitCursor = useCallback(
+    throttle((position: Point) => {
+      socketRef?.emit('cursor-move', position);
+    }, 30),
+    [socketRef]
+  );
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     updateActivity();
@@ -232,80 +265,85 @@ const Canvas: React.FC<CanvasProps> = ({
       y: e.clientY - rect.top
     };
 
-    socketRef?.emit('cursor-move', position);
+    throttledEmitCursor(position);
 
     if (!isDrawing.current || !currentPath || !startPoint.current) return;
 
-    const currentPoint = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-
     if (tool === 'rectangle' || tool === 'circle') {
-      updateShape(currentPoint);
+      updateShape(position);
       draw();
-    } else {
-      addPoint(currentPoint);
       emitDrawing({
-        points: currentPath.points,
+        id: currentPath.id,
+        points: [],
+        color: currentPath.color,
+        size: currentPath.size,
+        tool: currentPath.tool,
+        shapeData: {
+          startPoint: startPoint.current,
+          endPoint: position,
+          style: currentPath.shapeData?.style || 'stroke'
+        }
+      });
+    } else {
+      addPoint(position);
+      // Emit DELTA
+      emitDrawing({
+        id: currentPath.id,
+        point: position,
+        points: [],
         color: currentPath.color,
         size: currentPath.size,
         tool: currentPath.tool
       });
     }
-  }, [tool, currentPath, addPoint, updateShape, draw, emitDrawing, socketRef, updateActivity]);
+  }, [tool, currentPath, addPoint, updateShape, draw, emitDrawing, throttledEmitCursor, updateActivity]);
 
-  const handleShapeComplete = useCallback(() => {
-    if (!currentPath?.shapeData) return;
-
-    emitDrawing({
-      points: [],
+  const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDrawing.current || !currentPath) return;
+    
+    savePath({
+      id: currentPath.id,
+      points: currentPath.points,
       color: currentPath.color,
       size: currentPath.size,
       tool: currentPath.tool,
       shapeData: currentPath.shapeData
     });
-  }, [currentPath, emitDrawing]);
-
-  const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isDrawing.current) return;
-    
-    if (tool === 'rectangle' || tool === 'circle') {
-      handleShapeComplete();
-    }
 
     isDrawing.current = false;
     startPoint.current = null;
     endPath();
     notifyStopDrawing();
-  }, [tool, endPath, handleShapeComplete, notifyStopDrawing, updateActivity]);
+  }, [currentPath, savePath, endPath, notifyStopDrawing]);
 
   return (
-      <div className={styles.canvasContainer}>
-        <UsersList users={users} />
-        {Object.entries(otherCursors).map(([userId, position]) => {
-          const user = users.find(u => u.id === userId);
-          if (!user) return null;
-          return (
-            <UserCursor 
-              key={userId}
-              user={user}
-              position={position}
-            />
-          );
-        })}
-        <canvas
+    <div className={styles.canvasContainer}>
+      <UsersList users={users} />
+      {users.filter(u => u.id !== socketRef?.id).map((user) => (
+        <div 
+          key={user.id} 
+          ref={el => { cursorRefs.current[user.id] = el; }} 
+          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 50, transition: 'transform 0.05s linear' }}
+        >
+          <UserCursor 
+            user={user}
+            position={{x:0, y:0}}
+          />
+        </div>
+      ))}
+      <canvas
         ref={canvasRef}
         className={styles.canvas}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-      onMouseLeave={(e) => {
-        notifyStopDrawing();
-        handleMouseUp(e);
-      }}
+        onMouseLeave={(e) => {
+          if (isDrawing.current) {
+            handleMouseUp(e);
+          }
+        }}
       />
     </div>
   );

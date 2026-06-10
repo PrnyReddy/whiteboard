@@ -18,6 +18,8 @@ interface DrawingStore extends DrawingState {
   undo: () => void;
   redo: () => void;
   setRemotePath: (path: Path) => void;
+  appendRemotePoint: (id: string, point: Point) => void;
+  setRemotePaths: (paths: Path[]) => void;
 }
 
 export const useStore = create<DrawingStore>((set, get) => ({
@@ -117,13 +119,42 @@ export const useStore = create<DrawingStore>((set, get) => ({
 
   setRemotePath: (path: Path) => 
     set((state) => {
-      const newHistory = [...state.history, state.paths];
+      // Find if we already have this path (for shapes) and replace it
+      const existingIdx = state.paths.findIndex(p => p.id === path.id);
+      let newPaths;
+      if (existingIdx >= 0) {
+        newPaths = [...state.paths];
+        newPaths[existingIdx] = path;
+      } else {
+        newPaths = [...state.paths, path];
+      }
       return {
-        paths: [...state.paths, path],
-        history: newHistory,
+        paths: newPaths,
         redoStack: []
       };
     }),
+
+  appendRemotePoint: (id: string, point: Point) => 
+    set((state) => {
+      const existingIdx = state.paths.findIndex(p => p.id === id);
+      if (existingIdx >= 0) {
+        const newPaths = [...state.paths];
+        const path = newPaths[existingIdx];
+        newPaths[existingIdx] = {
+          ...path,
+          points: [...path.points, point]
+        };
+        return { paths: newPaths };
+      }
+      return state;
+    }),
+    
+  setRemotePaths: (paths: Path[]) => 
+    set(() => ({
+      paths,
+      history: [],
+      redoStack: []
+    })),
 
   undo: () => 
     set((state) => {

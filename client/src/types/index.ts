@@ -30,6 +30,8 @@ export interface DrawingState {
 }
 
 export interface DrawingData {
+  id: string;
+  point?: Point;
   points: Point[];
   color: string;
   size: number;
@@ -41,6 +43,7 @@ export interface UserData {
   id: string;
   color: string;
   name: string;
+  roomId?: string;
   isDrawing?: boolean;
   lastActive?: number;
   cursorPosition?: Point;
@@ -48,6 +51,7 @@ export interface UserData {
 
 export interface ServerToClientEvents {
   'drawing': (data: DrawingData) => void;
+  'room-state': (paths: DrawingData[]) => void;
   'client-count': (count: number) => void;
   'client-ready': (data: UserData) => void;
   'user-joined': (data: UserData) => void;
@@ -59,7 +63,9 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
+  'join-room': (roomId: string) => void;
   'draw': (data: DrawingData) => void;
+  'save-path': (data: DrawingData) => void;
   'client-ready': () => void;
   'start-drawing': () => void;
   'stop-drawing': () => void;

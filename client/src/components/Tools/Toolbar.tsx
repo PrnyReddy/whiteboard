@@ -57,8 +57,36 @@ const Toolbar = () => {
 
   const isShapeTool = tool === 'rectangle' || tool === 'circle';
 
+  const [copied, setCopied] = React.useState(false);
+  const handleShare = () => {
+    if (typeof window !== 'undefined') {
+      navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
     <div className={styles.toolbar}>
+      <button 
+        className={styles.toolButton} 
+        onClick={handleShare}
+        style={{ 
+          marginBottom: '15px', 
+          width: '100%', 
+          padding: '10px', 
+          borderRadius: '8px', 
+          background: copied ? '#43dd3bff' : '#fff', 
+          color: copied ? 'white' : '#333',
+          border: '1px solid #ddd',
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          transition: 'all 0.2s'
+        }}
+      >
+        {copied ? 'Copied! ✓' : '🔗 Share Room'}
+      </button>
+
       <CircularColorPicker />
       <div className={styles.toolSection}>
         {tools.map(({ name, icon }) => (

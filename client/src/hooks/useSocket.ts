@@ -8,37 +8,35 @@ import {
 } from '@/types';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
-let globalSocket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
+
+export const globalSocket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SOCKET_URL, {
+  transports: ['websocket'],
+  autoConnect: true,
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000,
+});
 
 export const useSocket = () => {
-  const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const [userColor, setUserColor] = useState<string>('#000000');
   const [users, setUsers] = useState<UserData[]>([]);
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
 
-  const setupSocket = useCallback(() => {
-    if (!globalSocket) {
-      globalSocket = io(SOCKET_URL, {
-        transports: ['websocket'],
-        forceNew: false,
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 10000
-      });
-      console.log('Created new global socket');
-    }
-
-    socketRef.current = globalSocket;
-
+  useEffect(() => {
     const handleConnect = () => {
-      console.log('Connected to server with ID:', socketRef.current?.id);
-      socketRef.current?.emit('client-ready');
+      console.log('Connected to server with ID:', globalSocket.id);
+      globalSocket.emit('client-ready');
+      if (currentRoomId) {
+        globalSocket.emit('join-room', currentRoomId);
+      }
     };
 
     const handleReconnect = () => {
       console.log('Reconnected, requesting latest state');
-      socketRef.current?.emit('client-ready');
+      globalSocket.emit('client-ready');
+      if (currentRoomId) {
+        globalSocket.emit('join-room', currentRoomId);
+      }
     };
 
     const handleClientReady = (userData: UserData) => {
@@ -72,94 +70,99 @@ export const useSocket = () => {
       console.error('Socket error:', error);
     };
 
-    const socket = socketRef.current;
-    if (socket) {
-      socket.on('connect', handleConnect);
-      socket.io.on('reconnect', handleReconnect);
-      socket.on('client-ready', handleClientReady);
-      socket.on('users-updated', handleUsersUpdate);
-      socket.on('user-joined', handleUserJoin);
-      socket.on('user-left', handleUserLeave);
-      socket.on('connect_error', handleError);
-
-      return () => {
-        socket.off('connect', handleConnect);
-        socket.io.off('reconnect', handleReconnect);
-        socket.off('client-ready', handleClientReady);
-        socket.off('users-updated', handleUsersUpdate);
-        socket.off('user-joined', handleUserJoin);
-        socket.off('user-left', handleUserLeave);
-        socket.off('connect_error', handleError);
-      };
+    // If already connected when hook mounts, trigger client-ready manually
+    if (globalSocket.connected) {
+      globalSocket.emit('client-ready');
+      if (currentRoomId) {
+        globalSocket.emit('join-room', currentRoomId);
+      }
     }
-    return () => {};
+
+    globalSocket.on('connect', handleConnect);
+    globalSocket.io.on('reconnect', handleReconnect);
+    globalSocket.on('client-ready', handleClientReady);
+    globalSocket.on('users-updated', handleUsersUpdate);
+    globalSocket.on('user-joined', handleUserJoin);
+    globalSocket.on('user-left', handleUserLeave);
+    globalSocket.on('connect_error', handleError);
+
+    return () => {
+      globalSocket.off('connect', handleConnect);
+      globalSocket.io.off('reconnect', handleReconnect);
+      globalSocket.off('client-ready', handleClientReady);
+      globalSocket.off('users-updated', handleUsersUpdate);
+      globalSocket.off('user-joined', handleUserJoin);
+      globalSocket.off('user-left', handleUserLeave);
+      globalSocket.off('connect_error', handleError);
+    };
+  }, [currentRoomId]);
+
+  const joinRoom = useCallback((roomId: string) => {
+    setCurrentRoomId(roomId);
+    if (globalSocket.connected) {
+      globalSocket.emit('join-room', roomId);
+    }
   }, []);
 
-  useEffect(() => {
-    const cleanup = setupSocket();
-    return () => {
-      if (cleanup) cleanup();
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-        globalSocket = null;
-      }
-    };
-  }, [setupSocket]);
-
   const emitDrawing = useCallback((drawingData: DrawingData) => {
-    if (socketRef.current) {
-      socketRef.current.emit('draw', drawingData);
-    }
+    globalSocket.emit('draw', drawingData);
+  }, []);
+
+  const savePath = useCallback((drawingData: DrawingData) => {
+    globalSocket.emit('save-path', drawingData);
   }, []);
 
   const subscribeToDrawing = useCallback((callback: (data: DrawingData) => void) => {
-    if (!socketRef.current) return () => {};
-
     const handleDrawing = (data: DrawingData) => {
       callback(data);
     };
-
-    socketRef.current.on('drawing', handleDrawing);
+    globalSocket.on('drawing', handleDrawing);
     return () => {
-      socketRef.current?.off('drawing', handleDrawing);
+      globalSocket.off('drawing', handleDrawing);
+    };
+  }, []);
+
+  const subscribeToRoomState = useCallback((callback: (paths: DrawingData[]) => void) => {
+    const handleRoomState = (paths: DrawingData[]) => {
+      callback(paths);
+    };
+    globalSocket.on('room-state', handleRoomState);
+    return () => {
+      globalSocket.off('room-state', handleRoomState);
     };
   }, []);
 
   const setName = useCallback((name: string) => {
-    if (socketRef.current) {
-      socketRef.current.emit('set-name', name);
-    }
+    globalSocket.emit('set-name', name);
   }, []);
 
   const startDrawing = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.emit('start-drawing');
-    }
+    globalSocket.emit('start-drawing');
   }, []);
 
   const stopDrawing = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.emit('stop-drawing');
-    }
+    globalSocket.emit('stop-drawing');
   }, []);
 
   const updateActivity = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.emit('activity');
-    }
+    globalSocket.emit('activity');
   }, []);
+
+  const setupSocket = useCallback(() => {}, []);
 
   return {
     setupSocket,
     emitDrawing,
+    savePath,
     subscribeToDrawing,
+    subscribeToRoomState,
+    joinRoom,
     userColor,
     users,
     setName,
     startDrawing,
     stopDrawing,
     updateActivity,
-    socket: socketRef.current
+    socket: globalSocket
   };
 };

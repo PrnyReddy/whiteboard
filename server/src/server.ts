@@ -1,5 +1,9 @@
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import { createClient } from 'redis';
+import { createAdapter } from '@socket.io/redis-adapter';
+import dotenv from 'dotenv';
+dotenv.config();
 import { 
   ClientToServerEvents, 
   ServerToClientEvents, 
@@ -22,9 +26,25 @@ const httpServer = createServer((req, res) => {
 
 const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(httpServer, {
   cors: {
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+    origin: process.env.CORS_ORIGIN || "*",
     methods: ["GET", "POST"]
   }
+});
+
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const pubClient = createClient({ url: REDIS_URL });
+const subClient = pubClient.duplicate();
+const stateClient = createClient({ url: REDIS_URL });
+
+Promise.all([
+  pubClient.connect(),
+  subClient.connect(),
+  stateClient.connect()
+]).then(() => {
+  io.adapter(createAdapter(pubClient, subClient));
+  console.log('Connected to Redis and initialized adapter');
+}).catch(err => {
+  console.error('Failed to connect to Redis', err);
 });
 
 const COLORS = [
@@ -46,76 +66,31 @@ class ColorManager {
       this.usedColors.add(availableColor);
       return availableColor;
     }
-
-    let newColor;
-    do {
-      newColor = this.generateRandomColor();
-    } while (this.isColorTooSimilar(newColor));
-
-    this.usedColors.add(newColor);
-    return newColor;
+    return '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
   }
 
   releaseColor(color: string) {
     this.usedColors.delete(color);
   }
-
-  private generateRandomColor(): string {
-    return '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
-  }
-
-  private hexToRgb(hex: string): { r: number, g: number, b: number } {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return {
-      r: parseInt(result![1], 16),
-      g: parseInt(result![2], 16),
-      b: parseInt(result![3], 16)
-    };
-  }
-
-  private isColorTooSimilar(newColor: string): boolean {
-    const rgb1 = this.hexToRgb(newColor);
-    return Array.from(this.usedColors).some(existingColor => {
-      const rgb2 = this.hexToRgb(existingColor);
-      const distance = Math.sqrt(
-        Math.pow(rgb2.r - rgb1.r, 2) +
-        Math.pow(rgb2.g - rgb1.g, 2) +
-        Math.pow(rgb2.b - rgb1.b, 2)
-      );
-      return distance < 100;
-    });
-  }
 }
 
 class UserManager {
   private users: Map<string, UserData>;
-  private usedNumbers: Set<number>;
   private disconnectTimers: Map<string, NodeJS.Timeout>;
   private colorManager: ColorManager;
 
   constructor() {
     this.users = new Map();
-    this.usedNumbers = new Set();
     this.disconnectTimers = new Map();
     this.colorManager = new ColorManager();
   }
 
-  getNextNumber(): number {
-    let number = 1;
-    while (this.usedNumbers.has(number)) {
-      number++;
-    }
-    this.usedNumbers.add(number);
-    return number;
-  }
-
   addUser(socketId: string): UserData {
-    const number = this.getNextNumber();
     const color = this.colorManager.getNextColor();
     const userData: UserData = {
       id: socketId,
       color,
-      name: `User ${number}`,
+      name: `User ${Math.floor(Math.random() * 1000)}`,
       isDrawing: false,
       lastActive: Date.now()
     };
@@ -131,87 +106,38 @@ class UserManager {
     }
   }
 
-  setColor(socketId: string, color: string): void {
-    this.updateUser(socketId, user => {
-      user.color = color;
-    });
-  }
-
-  setName(socketId: string, name: string): void {
-    this.updateUser(socketId, user => {
-      user.name = name;
-    });
-  }
-
-  setDrawingState(socketId: string, isDrawing: boolean): void {
-    this.updateUser(socketId, user => {
-      user.isDrawing = isDrawing;
-    });
-  }
-
-  updateCursorPosition(socketId: string, position: Point): void {
-    this.updateUser(socketId, user => {
-      user.cursorPosition = position;
-      user.lastActive = Date.now();
-    });
-  }
-
-  updateActivity(socketId: string): void {
-    this.updateUser(socketId, user => {
-      user.lastActive = Date.now();
-    });
-  }
-
-  handleDisconnect(socketId: string): void {
+  handleDisconnect(socketId: string, onRemove: (user: UserData) => void): void {
     if (this.disconnectTimers.has(socketId)) {
       clearTimeout(this.disconnectTimers.get(socketId));
-      this.disconnectTimers.delete(socketId);
     }
-
     const timer = setTimeout(() => {
-      this.removeUser(socketId);
-    }, 5000); 
-
-    this.disconnectTimers.set(socketId, timer);
-  }
-
-  removeUser(socketId: string): void {
-    if (this.disconnectTimers.has(socketId)) {
-      clearTimeout(this.disconnectTimers.get(socketId));
-      this.disconnectTimers.delete(socketId);
-    }
-
-    const user = this.users.get(socketId);
-    if (user) {
-      const number = parseInt(user.name.replace('User ', ''));
-      if (!isNaN(number)) {
-        this.usedNumbers.delete(number);
+      const user = this.users.get(socketId);
+      if (user) {
+        this.colorManager.releaseColor(user.color);
+        this.users.delete(socketId);
+        onRemove(user);
       }
-      this.colorManager.releaseColor(user.color);
-      this.users.delete(socketId);
-    }
+    }, 5000); 
+    this.disconnectTimers.set(socketId, timer);
   }
 
   getUser(socketId: string): UserData | undefined {
     return this.users.get(socketId);
   }
 
-  getAllUsers(): UserData[] {
-    return Array.from(this.users.values());
+  getUsersInRoom(roomId: string): UserData[] {
+    return Array.from(this.users.values()).filter(u => u.roomId === roomId);
   }
 
-  cleanup(timeout: number): string[] {
+  cleanup(timeout: number, onRemove: (user: UserData) => void): void {
     const now = Date.now();
-    const inactiveIds: string[] = [];
-
     this.users.forEach((user, id) => {
       if (now - (user.lastActive || 0) > timeout) {
-        inactiveIds.push(id);
+        this.colorManager.releaseColor(user.color);
+        this.users.delete(id);
+        onRemove(user);
       }
     });
-
-    inactiveIds.forEach(id => this.removeUser(id));
-    return inactiveIds;
   }
 }
 
@@ -219,56 +145,106 @@ const userManager = new UserManager();
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
-  
-  const userData = userManager.addUser(socket.id);
-  socket.emit('client-ready', userData);
-  socket.broadcast.emit('user-joined', userData);
-  io.emit('users-updated', userManager.getAllUsers());
+
+  socket.on('join-room', async (roomId: string) => {
+    socket.join(roomId);
+    socket.data.roomId = roomId;
+
+    let userData = userManager.getUser(socket.id);
+    if (!userData) {
+      userData = userManager.addUser(socket.id);
+    }
+    userManager.updateUser(socket.id, u => {
+      u.roomId = roomId;
+    });
+
+    socket.emit('client-ready', userData);
+    socket.to(roomId).emit('user-joined', userData);
+    io.to(roomId).emit('users-updated', userManager.getUsersInRoom(roomId));
+
+    try {
+      const stateStr = await stateClient.get(`room:${roomId}:state`);
+      if (stateStr) {
+        const paths = JSON.parse(stateStr);
+        socket.emit('room-state', paths);
+      }
+    } catch (err) {
+      console.error('Error fetching state', err);
+    }
+  });
 
   socket.on('activity', () => {
-    userManager.updateActivity(socket.id);
+    userManager.updateUser(socket.id, u => { u.lastActive = Date.now(); });
   });
 
   socket.on('cursor-move', (position: Point) => {
-    userManager.updateCursorPosition(socket.id, position);
-    socket.broadcast.emit('cursor-updated', {
-      userId: socket.id,
-      position
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    userManager.updateUser(socket.id, u => { 
+      u.cursorPosition = position; 
+      u.lastActive = Date.now();
     });
+    socket.to(roomId).emit('cursor-updated', { userId: socket.id, position });
   });
 
   socket.on('draw', (data: DrawingData) => {
-    userManager.updateActivity(socket.id);
-    socket.broadcast.emit('drawing', data);
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    userManager.updateUser(socket.id, u => { u.lastActive = Date.now(); });
+    socket.to(roomId).emit('drawing', data);
+  });
+
+  socket.on('save-path', async (data: DrawingData) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    try {
+      const stateStr = await stateClient.get(`room:${roomId}:state`);
+      const paths = stateStr ? JSON.parse(stateStr) : [];
+      paths.push(data);
+      await stateClient.set(`room:${roomId}:state`, JSON.stringify(paths));
+    } catch (err) {
+      console.error('Error saving path', err);
+    }
   });
 
   socket.on('start-drawing', () => {
-    userManager.setDrawingState(socket.id, true);
-    socket.broadcast.emit('user-started-drawing', socket.id);
-    io.emit('users-updated', userManager.getAllUsers());
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    userManager.updateUser(socket.id, u => { u.isDrawing = true; });
+    socket.to(roomId).emit('user-started-drawing', socket.id);
+    io.to(roomId).emit('users-updated', userManager.getUsersInRoom(roomId));
   });
 
   socket.on('stop-drawing', () => {
-    userManager.setDrawingState(socket.id, false);
-    socket.broadcast.emit('user-stopped-drawing', socket.id);
-    io.emit('users-updated', userManager.getAllUsers());
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    userManager.updateUser(socket.id, u => { u.isDrawing = false; });
+    socket.to(roomId).emit('user-stopped-drawing', socket.id);
+    io.to(roomId).emit('users-updated', userManager.getUsersInRoom(roomId));
   });
 
   socket.on('set-name', (name: string) => {
-    userManager.setName(socket.id, name);
-    io.emit('users-updated', userManager.getAllUsers());
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    userManager.updateUser(socket.id, u => { u.name = name; });
+    io.to(roomId).emit('users-updated', userManager.getUsersInRoom(roomId));
   });
 
   socket.on('color-change', (color: string) => {
-    userManager.setColor(socket.id, color);
-    io.emit('users-updated', userManager.getAllUsers());
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    userManager.updateUser(socket.id, u => { u.color = color; });
+    io.to(roomId).emit('users-updated', userManager.getUsersInRoom(roomId));
   });
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
-    userManager.handleDisconnect(socket.id);
-    socket.broadcast.emit('user-left', socket.id);
-    io.emit('users-updated', userManager.getAllUsers());
+    userManager.handleDisconnect(socket.id, (user) => {
+      if (user.roomId) {
+        io.to(user.roomId).emit('user-left', user.id);
+        io.to(user.roomId).emit('users-updated', userManager.getUsersInRoom(user.roomId));
+      }
+    });
   });
 });
 
@@ -276,13 +252,12 @@ const CLEANUP_INTERVAL = 60000;
 const INACTIVE_TIMEOUT = 5 * 60 * 1000;
 
 setInterval(() => {
-  const inactiveIds = userManager.cleanup(INACTIVE_TIMEOUT);
-  if (inactiveIds.length > 0) {
-    inactiveIds.forEach(id => {
-      io.emit('user-left', id);
-    });
-    io.emit('users-updated', userManager.getAllUsers());
-  }
+  userManager.cleanup(INACTIVE_TIMEOUT, (user) => {
+    if (user.roomId) {
+      io.to(user.roomId).emit('user-left', user.id);
+      io.to(user.roomId).emit('users-updated', userManager.getUsersInRoom(user.roomId));
+    }
+  });
 }, CLEANUP_INTERVAL);
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
