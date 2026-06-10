@@ -50,7 +50,7 @@ const CircularColorPicker: React.FC = () => {
       ctx.fillStyle = gradient;
       ctx.fill();
     }
-  }, []);
+  }, [saturation, lightness]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
